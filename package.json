@@ -1,0 +1,32 @@
+{
+  "name": "cordova-plugin-pedometer",
+  "version": "0.1",
+  "author": "Dario Salvi <dariosalvi78@gmail.com>",
+  "description": "Cordova Plugin that logs a set of specified sensors on files.",
+  "cordova": {
+    "id": "cordova-plugin-sensorlogger",
+    "platforms": [
+      "android"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dariosalvi78/cordova-plugin-sensorlogger.git"
+  },
+  "keywords": [
+    "cordova",
+    "sensors",
+    "logging"
+  ],
+  "engines": [
+    {
+      "name": "cordova",
+      "version": ">=3.0.0"
+    }
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dariosalvi78/cordova-plugin-sensorlogger/issues"
+  },
+  "homepage": "https://github.com/dariosalvi78/cordova-plugin-sensorlogger#readme"
+}
