@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-pedometer" version="0.4">
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-sensorlogger" version="0.4">
     <name>SensorLogger</name>
     <author>Dario Salvi</author>
     <description>Cordova Plugin that logs a set of specified sensors on files.</description>
