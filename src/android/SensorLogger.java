@@ -4,16 +4,36 @@
  */
 package org.apache.cordova.sensorlogger;
 
+import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.os.Environment;
+import android.util.Log;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.util.LinkedList;
+import java.util.List;
+
 /**
  * Logs a set of sensors into separate files
  * Created by Dario Salvi on 05/11/2015.
  */
-public class SensorsLogger {
+public class SensorLogger {
 
     //standard sensors stuff
     SensorManager sensorMng;
-    List<Sensor> sensors = new LinkedList<>();
-    List<SensorEventListener> sensorListeners = new LinkedList<>();
+    List<Sensor> sensors = new LinkedList<Sensor>();
+    List<SensorEventListener> sensorListeners = new LinkedList<SensorEventListener>();
 
     //orientation stuff
     float[] mGravity;
@@ -24,18 +44,18 @@ public class SensorsLogger {
     LocationManager locationMng;
     LocationListener locListener = null;
 
-    List<OutputStreamWriter> writers = new LinkedList<>();
+    List<OutputStreamWriter> writers = new LinkedList<OutputStreamWriter>();
 
     boolean logging = false;
 
-    public SensorsLogger(Context ctx, String[] sensortypes) throws IOException {
+    public SensorLogger(Context ctx, String[] sensortypes) throws IOException {
         locationMng = (LocationManager) ctx.getSystemService(Context.LOCATION_SERVICE);
         sensorMng = (SensorManager) ctx.getSystemService(Context.SENSOR_SERVICE);
 
         for (String type : sensortypes) {
             //start file
             if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
-                Log.e(SensorsLogger.class.getName(), "SD card not writeable");
+                Log.e(SensorLogger.class.getName(), "SD card not writeable");
                 throw new IOException("External storage is not writeable");
             }
 
@@ -55,7 +75,7 @@ public class SensorsLogger {
                             out.append(line);
                             out.flush();
                         } catch (IOException ex) {
-                            Log.e(SensorsLogger.class.getName(), "Error while writing log on file", ex);
+                            Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                         }
                     }
                     @Override
@@ -96,7 +116,7 @@ public class SensorsLogger {
                                 try {
                                     out.append(line);
                                 } catch (IOException ex) {
-                                    Log.e(SensorsLogger.class.getName(), "Error while writing log on file", ex);
+                                    Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                                 }
                             }
                         }
@@ -106,33 +126,24 @@ public class SensorsLogger {
                     }
                 };
             } else {
-                switch (type) {
-                    case "accelerometer":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_ACCELEROMETER));
-                        break;
-                    case "gravity":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_GRAVITY));
-                        break;
-                    case "gyroscope":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_GYROSCOPE));
-                        break;
-                    case "rotation":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR));
-                        break;
-                    case "magnetometer":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD));
-                        break;
-                    case "light":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_LIGHT));
-                        break;
-                    case "setpcounter":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_STEP_COUNTER));
-                        break;
-                    case "heartrate":
-                        sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_HEART_RATE));
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Unknown sensor type " + type);
+                if (type.equals("accelerometer")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_ACCELEROMETER));
+                } else if (type.equals("gravity")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_GRAVITY));
+                } else if (type.equals("gyroscope")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_GYROSCOPE));
+                } else if (type.equals("rotation")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR));
+                } else if (type.equals("magnetometer")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD));
+                } else if (type.equals("light")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_LIGHT));
+                } else if (type.equals("setpcounter")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_STEP_COUNTER));
+                } else if (type.equals("heartrate")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_HEART_RATE));
+                } else {
+                    throw new IllegalArgumentException("Unknown sensor type " + type);
                 }
 
                 sensorListeners.add(new SensorEventListener() {
@@ -148,7 +159,7 @@ public class SensorsLogger {
                         try {
                             out.append(line);
                         } catch (IOException ex) {
-                            Log.e(SensorsLogger.class.getName(), "Error while writing log on file", ex);
+                            Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                         }
                     }
                     @Override
@@ -177,7 +188,7 @@ public class SensorsLogger {
             try {
                 locationMng.requestLocationUpdates(500, 0, crit, locListener, null);
             } catch (SecurityException ex) {
-                Log.e(SensorsLogger.class.getName(), "Cannot access location, permission denied", ex);
+                Log.e(SensorLogger.class.getName(), "Cannot access location, permission denied", ex);
             }
         }
         logging = true;
@@ -198,7 +209,7 @@ public class SensorsLogger {
             try{
                 locationMng.removeUpdates(locListener);
             } catch (SecurityException ex){
-                Log.e(SensorsLogger.class.getName(), "Cannot access location, permission denied", ex);
+                Log.e(SensorLogger.class.getName(), "Cannot access location, permission denied", ex);
             }
             locListener = null;
         }
@@ -207,7 +218,7 @@ public class SensorsLogger {
             try {
                 writer.close();
             } catch (IOException ex) {
-                Log.e(SensorsLogger.class.getName(), "Error while closing log file", ex);
+                Log.e(SensorLogger.class.getName(), "Error while closing log file", ex);
             }
         }
         logging = false;
