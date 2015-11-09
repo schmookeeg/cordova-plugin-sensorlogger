@@ -38,7 +38,7 @@ sensorlogger.start(successCallback, failureCallback);
 Stops logging.
 
 ```js
-sensorlogger.init(sensors, successCallback, failureCallback);
+sensorlogger.stop(successCallback, failureCallback);
 ```
 - => `successCallback` is called if OK
 - => `failureCallback` is called if there was an error
