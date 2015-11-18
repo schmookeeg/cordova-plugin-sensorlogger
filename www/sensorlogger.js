@@ -1,5 +1,3 @@
-cordova.define("cordova-plugin-sensorlogger.SensorLogger", function(require, exports, module) {
-
 var exec = require("cordova/exec");
 
 var SensorLogger = function () {
@@ -20,5 +18,3 @@ SensorLogger.prototype.stop = function (onSuccess, onError) {
 
 
 module.exports = new SensorLogger();
-
-});
