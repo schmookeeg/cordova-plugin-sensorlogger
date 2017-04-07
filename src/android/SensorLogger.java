@@ -4,7 +4,14 @@
  */
 package org.apache.cordova.sensorlogger;
 
+import android.Manifest;
+import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -15,23 +22,37 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.telecom.Call;
 import android.util.Log;
 
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaInterface;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.PluginResult;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.LinkedList;
 import java.util.List;
 
-/**
- * Logs a set of sensors into separate files
- * Created by Dario Salvi on 05/11/2015.
- */
-public class SensorLogger {
+public class SensorLogger extends CordovaPlugin {
+
+    private static final String LOG_NAME = SensorLogger.class.getName();
+
+    boolean logging = false;
+
+    List<OutputStreamWriter> writers = new LinkedList<OutputStreamWriter>();
 
     //standard sensors stuff
     SensorManager sensorMng;
+    List<String> sensortypes = new LinkedList<String>();
     List<Sensor> sensors = new LinkedList<Sensor>();
     List<SensorEventListener> sensorListeners = new LinkedList<SensorEventListener>();
 
@@ -44,23 +65,130 @@ public class SensorLogger {
     LocationManager locationMng;
     LocationListener locListener = null;
 
-    List<OutputStreamWriter> writers = new LinkedList<OutputStreamWriter>();
+    //permissions stuff
+    List<String> perms = new LinkedList<String>();
+    private static final int REQUEST_DYN_PERMS = 55;
+    CallbackContext authReqCallbackCtx;
 
-    boolean logging = false;
+    /**
+     * Sets the context of the Command.
+     *
+     * @param cordova the context of the main Activity.
+     * @param webView the associated CordovaWebView.
+     */
+    @Override
+    public void initialize(CordovaInterface cordova, CordovaWebView webView) {
+        super.initialize(cordova, webView);
 
-    public SensorLogger(Context ctx, String[] sensortypes) throws IOException {
-        locationMng = (LocationManager) ctx.getSystemService(Context.LOCATION_SERVICE);
-        sensorMng = (SensorManager) ctx.getSystemService(Context.SENSOR_SERVICE);
+        locationMng = (LocationManager) webView.getContext().getSystemService(Context.LOCATION_SERVICE);
+        sensorMng = (SensorManager) webView.getContext().getSystemService(Context.SENSOR_SERVICE);
+    }
+
+    /**
+     * Executes the request.
+     *
+     * @param action the action to execute.
+     * @param args the exec() arguments.
+     * @param callbackContext the callback context used when calling back into JavaScript.
+     * @return whether the action was valid.
+     */
+    public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) {
+
+        if (action.equalsIgnoreCase("init")) {
+			if(logging){
+				stop();
+			}
+            sensortypes.clear();
+            try{
+                JSONArray strings = args.getJSONArray(0);
+                for(int i=0; i<strings.length(); i++)
+                    sensortypes.add(strings.getString(i));
+            } catch (JSONException ex){
+                callbackContext.error(ex.getMessage());
+                return true;
+            }
+            requestPermissions(callbackContext, sensortypes);
+            return true;
+        } else if (action.equalsIgnoreCase("start")) {
+            sensors.clear();
+            sensorListeners.clear();
+            writers.clear();
+            start(callbackContext);
+            return true;
+        } else if (action.equalsIgnoreCase("stop")) {
+            stop();
+            callbackContext.success();
+            return true;
+        }
+        return false;
+    }
+
+    private void requestPermissions(final CallbackContext callbackContext, List<String> sensortypes) {
+        if (!cordova.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+
+        for (String type : sensortypes) {
+            if(type.equalsIgnoreCase("location")){
+                if (!cordova.hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    perms.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+                }
+                if (!cordova.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    perms.add(Manifest.permission.ACCESS_FINE_LOCATION);
+                }
+            } else if (type.equals("heartrate")) {
+                if (!cordova.hasPermission(Manifest.permission.BODY_SENSORS)) {
+                    perms.add(Manifest.permission.BODY_SENSORS);
+                }
+            }
+        }
+        if (perms.isEmpty()) {
+            // nothing to be done
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
+        } else {
+            authReqCallbackCtx = callbackContext;
+            cordova.requestPermissions(this, REQUEST_DYN_PERMS, perms.toArray(new String[perms.size()]));
+        }
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        if (requestCode == REQUEST_DYN_PERMS) {
+            for (int i = 0; i < grantResults.length; i++) {
+                if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                    String errmsg = "Permission denied ";
+                    for (String perm : permissions) {
+                        errmsg += " " + perm;
+                    }
+                    authReqCallbackCtx.error("Permission denied: " + permissions[i]);
+                    return;
+                }
+            }
+            //all accepted!
+            authReqCallbackCtx.success();
+        }
+    }
+
+    public void start(CallbackContext callbackContext) {
+        if(logging)
+            return;
 
         for (String type : sensortypes) {
             //start file
             if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
-                Log.e(SensorLogger.class.getName(), "SD card not writeable");
-                throw new IOException("External storage is not writeable");
+                Log.e(LOG_NAME, "SD card not writeable");
+                callbackContext.error("External storage is not writeable");
             }
 
             File file = new File(Environment.getExternalStorageDirectory() + "/" + type + ".csv");
-            FileOutputStream outputStream = new FileOutputStream(file);
+            FileOutputStream outputStream = null;
+            try {
+                outputStream = new FileOutputStream(file);
+            } catch (FileNotFoundException e) {
+                Log.e(LOG_NAME, "SD card not writeable");
+                e.printStackTrace();
+                callbackContext.error("External storage is not writeable");
+            }
             final OutputStreamWriter out = new OutputStreamWriter(outputStream);
             writers.add(out);
 
@@ -162,6 +290,7 @@ public class SensorLogger {
                             Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                         }
                     }
+
                     @Override
                     public void onAccuracyChanged(Sensor sensor, int accuracy) {
                         //nothing to do here
@@ -169,11 +298,6 @@ public class SensorLogger {
                 });
             }
         }
-    }
-
-    public void start() {
-        if(logging)
-            return;
 
         for (int i = 0; i < sensors.size(); i++) {
             sensorMng.registerListener(sensorListeners.get(i), sensors.get(i), SensorManager.SENSOR_DELAY_FASTEST);
@@ -188,13 +312,15 @@ public class SensorLogger {
             try {
                 locationMng.requestLocationUpdates(500, 0, crit, locListener, null);
             } catch (SecurityException ex) {
-                Log.e(SensorLogger.class.getName(), "Cannot access location, permission denied", ex);
+                Log.e(LOG_NAME, "Cannot access location, permission denied", ex);
             }
         }
         logging = true;
+
+        callbackContext.success();
     }
 
-    public void stop() {
+    private void stop() {
         if(!logging)
             return;
 
@@ -222,9 +348,5 @@ public class SensorLogger {
             }
         }
         logging = false;
-    }
-
-    public boolean isLogging(){
-        return logging;
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-pedometer",
-  "version": "0.1",
+  "version": "1.0.0",
   "author": "Dario Salvi <dariosalvi78@gmail.com>",
   "description": "Cordova Plugin that logs a set of specified sensors on files.",
   "cordova": {

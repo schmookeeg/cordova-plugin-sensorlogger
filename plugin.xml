@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-sensorlogger" version="0.4">
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-sensorlogger" version="1.0.0">
     <name>SensorLogger</name>
     <author>Dario Salvi</author>
     <description>Cordova Plugin that logs a set of specified sensors on files.</description>
     <keywords>cordova, sensors, logging</keywords>
     <license>MIT</license>
     <engines>
-        <engine name="cordova" version=">=3.0.0" />
+        <engine name="cordova" version=">=6.0.0" />
     </engines>
     <js-module src="www/sensorlogger.js" name="SensorLogger">
         <clobbers target="sensorlogger" />
@@ -17,7 +17,7 @@
 
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="SensorLogger">
-                <param name="android-package" value="org.apache.cordova.sensorlogger.Plugin"/>
+                <param name="android-package" value="org.apache.cordova.sensorlogger.SensorLogger"/>
             </feature>
         </config-file>
 		
@@ -26,10 +26,10 @@
           <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 		  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 		  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+		  <uses-permission android:name="android.permission.BODY_SENSORS" />
         </config-file>
 
         <source-file src="src/android/SensorLogger.java" target-dir="src/org/apache/cordova/sensorlogger" />
-		<source-file src="src/android/Plugin.java" target-dir="src/org/apache/cordova/sensorlogger" />
 
     </platform>
 </plugin>
