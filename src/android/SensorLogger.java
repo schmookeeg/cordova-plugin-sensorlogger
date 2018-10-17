@@ -70,6 +70,8 @@ public class SensorLogger extends CordovaPlugin {
     private static final int REQUEST_DYN_PERMS = 55;
     CallbackContext authReqCallbackCtx;
 
+    CallbackContext cb;
+
     /**
      * Sets the context of the Command.
      *
@@ -93,6 +95,7 @@ public class SensorLogger extends CordovaPlugin {
      * @return whether the action was valid.
      */
     public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) {
+        cb = callbackContext;
 
         if (action.equalsIgnoreCase("init")) {
 			if(logging){
@@ -103,6 +106,7 @@ public class SensorLogger extends CordovaPlugin {
                 JSONArray strings = args.getJSONArray(0);
                 for(int i=0; i<strings.length(); i++)
                     sensortypes.add(strings.getString(i));
+                callbackContext.success(strings);
             } catch (JSONException ex){
                 callbackContext.error(ex.getMessage());
                 return true;
@@ -169,12 +173,13 @@ public class SensorLogger extends CordovaPlugin {
         }
     }
 
-    public void start(CallbackContext callbackContext) {
+    public void start(final CallbackContext callbackContext) {
         if(logging)
             return;
 
         for (String type : sensortypes) {
             //start file
+            /*
             if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
                 Log.e(LOG_NAME, "SD card not writeable");
                 callbackContext.error("External storage is not writeable");
@@ -191,6 +196,7 @@ public class SensorLogger extends CordovaPlugin {
             }
             final OutputStreamWriter out = new OutputStreamWriter(outputStream);
             writers.add(out);
+            */
 
             if(type.equalsIgnoreCase("location")){
                 locListener = new LocationListener() {
@@ -198,11 +204,15 @@ public class SensorLogger extends CordovaPlugin {
                     public void onLocationChanged(Location location) {
                         long ts = location.getTime();
                         float acc = location.getAccuracy();
-                        String line = ts + "," + acc + "," + location.getLatitude() + "," + location.getLongitude() + "," + location.getAltitude() + "," + location.getSpeed() + "," + location.getBearing() + "\n";
+                        
+                        String line = "-2,Location," + ts + "," + acc + "," + location.getLatitude() + "," + location.getLongitude() + "," + location.getAltitude() + "," + location.getSpeed() + "," + location.getBearing();
                         try {
-                            out.append(line);
-                            out.flush();
-                        } catch (IOException ex) {
+                            //cb.success(line);
+                            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, line);
+                            pluginResult.setKeepCallback(true);
+                            cb.sendPluginResult(pluginResult);
+                            //out.flush();
+                        } catch  (Exception ex) {
                             Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                         }
                     }
@@ -236,14 +246,17 @@ public class SensorLogger extends CordovaPlugin {
                                 SensorManager.getOrientation(R, orientation);
                                 long ts = event.timestamp;
                                 int acc = event.accuracy;
-                                String line = ts + "," + acc;
+                                String line = "-1,Orientation," + ts + "," + acc;
                                 for (int j = 0; j < orientation.length; j++) {
                                     line += "," + orientation[j];
                                 }
-                                line += "\n";
+                                //line += "\n";
                                 try {
-                                    out.append(line);
-                                } catch (IOException ex) {
+                                    PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, line);
+                                    pluginResult.setKeepCallback(true);
+                                    cb.sendPluginResult(pluginResult);
+                                    //cb.success(line);
+                                } catch (Exception ex) {
                                     Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                                 }
                             }
@@ -270,6 +283,14 @@ public class SensorLogger extends CordovaPlugin {
                     sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_STEP_COUNTER));
                 } else if (type.equals("heartrate")) {
                     sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_HEART_RATE));
+                } else if (type.equals("temperature")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE));
+                } else if (type.equals("pressure")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_PRESSURE));
+                } else if (type.equals("proximity")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_PROXIMITY));
+                } else if (type.equals("humidity")) {
+                    sensors.add(sensorMng.getDefaultSensor(Sensor.TYPE_RELATIVE_HUMIDITY));
                 } else {
                     throw new IllegalArgumentException("Unknown sensor type " + type);
                 }
@@ -279,14 +300,19 @@ public class SensorLogger extends CordovaPlugin {
                     public void onSensorChanged(SensorEvent event) {
                         long ts = event.timestamp;
                         int acc = event.accuracy;
-                        String line = ts + "," + acc;
+                        String name = event.sensor.getName();
+                        String tname = String.valueOf(event.sensor.getType());
+                        String line = tname + "," + name + "," + ts + "," + acc;
                         for (int j = 0; j < event.values.length; j++) {
                             line += "," + event.values[j];
                         }
-                        line += "\n";
+                        //line += "\n";
                         try {
-                            out.append(line);
-                        } catch (IOException ex) {
+                            //cb.success(line);
+                            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, line);
+                            pluginResult.setKeepCallback(true);
+                            cb.sendPluginResult(pluginResult);
+                        } catch (Exception ex) {
                             Log.e(SensorLogger.class.getName(), "Error while writing log on file", ex);
                         }
                     }
@@ -300,11 +326,11 @@ public class SensorLogger extends CordovaPlugin {
         }
 
         for (int i = 0; i < sensors.size(); i++) {
-            sensorMng.registerListener(sensorListeners.get(i), sensors.get(i), SensorManager.SENSOR_DELAY_FASTEST);
+            sensorMng.registerListener(sensorListeners.get(i), sensors.get(i), SensorManager.SENSOR_DELAY_NORMAL);
         }
         if(orientationListener != null){
-            sensorMng.registerListener(orientationListener, sensorMng.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_FASTEST);
-            sensorMng.registerListener(orientationListener, sensorMng.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_FASTEST);
+            sensorMng.registerListener(orientationListener, sensorMng.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_NORMAL);
+            sensorMng.registerListener(orientationListener, sensorMng.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
         }
         if (locListener != null) {
             Criteria crit = new Criteria();
@@ -317,7 +343,7 @@ public class SensorLogger extends CordovaPlugin {
         }
         logging = true;
 
-        callbackContext.success();
+        //callbackContext.success();
     }
 
     private void stop() {
